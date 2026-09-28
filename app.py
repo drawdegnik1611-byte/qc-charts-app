@@ -12,15 +12,26 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- HÀM TRÍCH XUẤT BẢNG TỪ FILE WORD ---
+# --- HÀM TRÍCH XUẤT BẢNG TỪ FILE WORD (ĐÃ NÂNG CẤP CHỐNG LỖI GỘP Ô) ---
 def extract_tables_from_word(uploaded_file):
     doc = docx.Document(uploaded_file)
     tables_data = []
     for i, table in enumerate(doc.tables):
-        data = [[cell.text.strip().replace('\n', ' ') for cell in row.cells] for row in table.rows]
+        # 1. Tìm số lượng cột lớn nhất trong bảng để làm chuẩn
+        max_cols = max(len(row.cells) for row in table.rows) if table.rows else 0
+        
+        # 2. Quét dữ liệu và ép tất cả các dòng phải dài bằng max_cols
+        data = []
+        for row in table.rows:
+            row_data = [cell.text.strip().replace('\n', ' ') for cell in row.cells]
+            # Nếu dòng này bị thiếu cột (do gộp ô ở Word), tự động bù thêm cột rỗng
+            row_data = row_data + [""] * (max_cols - len(row_data))
+            data.append(row_data)
+            
         if len(data) > 1:
             raw_columns = data[0]
             
-            # Tự động phát hiện và đổi tên nếu có cột trùng lặp
+            # 3. Xử lý trùng tên cột
             new_cols = []
             col_counts = {}
             for col in raw_columns:
@@ -32,6 +43,7 @@ def extract_tables_from_word(uploaded_file):
                     col_counts[col_name] = 0
                     new_cols.append(col_name)
                     
+            # Tạo bảng an toàn
             df = pd.DataFrame(data[1:], columns=new_cols)
             tables_data.append((f"Bảng {i+1} trong Word", df))
     return tables_data
