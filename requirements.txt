@@ -4,4 +4,4 @@ numpy
 pandas
 python-docx
 openpyxl
-kaleido
+kaleido==0.2.1.post1
