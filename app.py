@@ -106,81 +106,109 @@ if tool_mode == "📉 Biểu đồ Shewhart (I-MR)":
             except: pass
 
 # ==========================================
-# GIAO DIỆN 2: BIỂU ĐỒ PHÂN TÁN (MỚI)
+# GIAO DIỆN 2: BIỂU ĐỒ PHÂN TÁN
 # ==========================================
 elif tool_mode == "📈 Biểu đồ Phân tán (Scatter)":
-    st.info("💡 Bạn có thể tải lên file Word (.docx), Excel (.xlsx) hoặc CSV. Hệ thống sẽ tự động tìm bảng dữ liệu bên trong.")
     
-    # Nút Upload File
-    uploaded_file = st.file_uploader("Tải file dữ liệu lên", type=["docx", "xlsx", "csv"])
+    input_method = st.radio("⚙️ Chọn phương thức nhập dữ liệu:", ["📁 Tải file lên", "✍️ Nhập tay (Copy/Paste)"], horizontal=True)
+    st.markdown("---")
     
-    if uploaded_file is not None:
-        file_ext = uploaded_file.name.split('.')[-1]
-        df_list = []
-        
-        # Xử lý các loại file khác nhau
-        try:
-            if file_ext == 'docx':
-                df_list = extract_tables_from_word(uploaded_file)
-            elif file_ext == 'xlsx':
-                excel_file = pd.ExcelFile(uploaded_file)
-                for sheet in excel_file.sheet_names:
-                    df_list.append((f"Sheet: {sheet}", excel_file.parse(sheet).astype(str)))
-            elif file_ext == 'csv':
-                df_list.append(("Dữ liệu CSV", pd.read_csv(uploaded_file).astype(str)))
-        except Exception as e:
-            st.error(f"Lỗi đọc file: {e}")
-            
-        if not df_list:
-            st.warning("⚠️ Không tìm thấy bảng dữ liệu nào trong file này.")
+    df = pd.DataFrame() # Khởi tạo bảng rỗng
+    
+    # --- TRƯỜNG HỢP 1: TẢI FILE ---
+    if input_method == "📁 Tải file lên":
+        uploaded_file = st.file_uploader("Tải file dữ liệu (.docx, .xlsx, .csv)", type=["docx", "xlsx", "csv"])
+        if uploaded_file is None:
+            st.warning("⚠️ Lưu ý: Hệ thống không hỗ trợ file Word cũ (.doc). Vui lòng 'Save As' sang định dạng .docx trước khi tải lên.")
         else:
-            # Nếu file Word có nhiều bảng, cho người dùng chọn bảng
-            table_names = [item[0] for item in df_list]
-            selected_table_name = st.selectbox("Chọn bảng chứa dữ liệu:", table_names)
-            
-            # Lấy DataFrame tương ứng với bảng được chọn
-            df = next(item[1] for item in df_list if item[0] == selected_table_name)
-            
-            st.write("👀 **Kiểm tra & Chỉnh sửa Dữ liệu:**")
-            st.caption("💡 Bạn có thể click đúp vào ô để sửa số, hoặc chọn các dòng thừa (chứa chữ/tiêu đề) và bấm phím Delete/Backspace để xóa.")
-            
-            # Vũ khí 1: Hiển thị bảng tương tác (cho phép thêm/sửa/xóa trực tiếp)
-            edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True, height=250)
-            
-            # Chọn cột X và Y từ bảng đã chỉnh sửa
-            col1, col2 = st.columns(2)
-            with col1:
-                x_col = st.selectbox("Chọn cột cho Trục X (Hoành):", edited_df.columns)
-            with col2:
-                y_col = st.selectbox("Chọn cột cho Trục Y (Tung):", [c for c in edited_df.columns if c != x_col])
+            file_ext = uploaded_file.name.split('.')[-1]
+            df_list = []
+            try:
+                if file_ext == 'docx':
+                    df_list = extract_tables_from_word(uploaded_file)
+                elif file_ext == 'xlsx':
+                    excel_file = pd.ExcelFile(uploaded_file)
+                    for sheet in excel_file.sheet_names:
+                        df_list.append((f"Sheet: {sheet}", excel_file.parse(sheet).astype(str)))
+                elif file_ext == 'csv':
+                    df_list.append(("Dữ liệu CSV", pd.read_csv(uploaded_file).astype(str)))
+            except Exception as e:
+                st.error(f"Lỗi đọc file: {e}")
                 
-            if st.button("🚀 VẼ BIỂU ĐỒ PHÂN TÁN", type="primary"):
-                try:
-                    # Vũ khí 2: Ép kiểu dữ liệu cực mạnh. Cứ thấy chữ là biến thành NaN (Not a Number)
-                    x_raw = edited_df[x_col].astype(str).str.replace(',', '.')
-                    y_raw = edited_df[y_col].astype(str).str.replace(',', '.')
+            if not df_list:
+                st.warning("⚠️ Không tìm thấy bảng dữ liệu nào trong file này.")
+            else:
+                table_names = [item[0] for item in df_list]
+                selected_table_name = st.selectbox("Chọn bảng chứa dữ liệu:", table_names)
+                df = next(item[1] for item in df_list if item[0] == selected_table_name)
+
+    # --- TRƯỜNG HỢP 2: NHẬP TAY ---
+    else:
+        st.write("📝 **Nhập trực tiếp dữ liệu (Copy 2 cột từ Word/Excel dán vào đây):**")
+        col_x, col_y = st.columns(2)
+        
+        with col_x:
+            x_col_name = st.text_input("Tên đại lượng Trục X:", value="Trục X (Hoành)")
+            x_input_data = st.text_area("Dữ liệu Trục X:", height=150)
+            
+        with col_y:
+            y_col_name = st.text_input("Tên đại lượng Trục Y:", value="Trục Y (Tung)")
+            y_input_data = st.text_area("Dữ liệu Trục Y:", height=150)
+            
+        if x_input_data.strip() and y_input_data.strip():
+            # Xử lý cắt chuỗi thành mảng số
+            x_parts = x_input_data.replace(",", ".").split()
+            y_parts = y_input_data.replace(",", ".").split()
+            
+            # Cân bằng độ dài 2 cột nếu người dùng dán thiếu
+            min_len = min(len(x_parts), len(y_parts))
+            if min_len > 0:
+                df = pd.DataFrame({
+                    x_col_name: x_parts[:min_len],
+                    y_col_name: y_parts[:min_len]
+                })
+                if len(x_parts) != len(y_parts):
+                    st.warning(f"⚠️ Chú ý: Trục X có {len(x_parts)} số, Trục Y có {len(y_parts)} số. Hệ thống sẽ tự động ghép {min_len} cặp số đầu tiên để vẽ biểu đồ.")
+
+    # --- PHẦN CHUNG: KIỂM TRA & VẼ BIỂU ĐỒ (Dùng chung cho cả 2 cách nhập) ---
+    if not df.empty:
+        st.write("👀 **Kiểm tra & Chỉnh sửa Dữ liệu:**")
+        st.caption("💡 Bạn có thể click đúp vào ô để sửa số, hoặc chọn các dòng thừa (chứa chữ/tiêu đề) và bấm phím Delete/Backspace để xóa.")
+        
+        edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True, height=250)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            x_col = st.selectbox("Chọn cột cho Trục X (Hoành):", edited_df.columns, index=0)
+        with col2:
+            # Lọc danh sách Y để không trùng với X
+            y_options = [c for c in edited_df.columns if c != x_col]
+            y_col = st.selectbox("Chọn cột cho Trục Y (Tung):", y_options if y_options else edited_df.columns)
+            
+        if st.button("🚀 VẼ BIỂU ĐỒ PHÂN TÁN", type="primary"):
+            try:
+                # Ép kiểu dữ liệu cực mạnh: thấy chữ là xóa
+                x_raw = edited_df[x_col].astype(str).str.replace(',', '.')
+                y_raw = edited_df[y_col].astype(str).str.replace(',', '.')
+                
+                x_clean = pd.to_numeric(x_raw, errors='coerce')
+                y_clean = pd.to_numeric(y_raw, errors='coerce')
+                
+                temp_df = pd.DataFrame({'x': x_clean, 'y': y_clean}).dropna()
+                
+                if temp_df.empty or len(temp_df) < 2:
+                    st.error("⚠️ Sau khi làm sạch, không còn đủ dữ liệu số để vẽ. Vui lòng kiểm tra lại cột đã chọn.")
+                else:
+                    x_data = temp_df['x'].tolist()
+                    y_data = temp_df['y'].tolist()
                     
-                    x_clean = pd.to_numeric(x_raw, errors='coerce')
-                    y_clean = pd.to_numeric(y_raw, errors='coerce')
+                    fig_scatter = create_scatter_chart(x_data, y_data, x_col, y_col, pl_num)
+                    st.plotly_chart(fig_scatter, use_container_width=True, config={'displayModeBar': False})
                     
-                    # Gom 2 cột lại và dropna() để lọc vứt bỏ các dòng NaN (các dòng ban đầu là chữ)
-                    temp_df = pd.DataFrame({'x': x_clean, 'y': y_clean}).dropna()
-                    
-                    if temp_df.empty or len(temp_df) < 2:
-                        st.error("⚠️ Sau khi làm sạch, không còn đủ dữ liệu số để vẽ. Vui lòng kiểm tra lại cột đã chọn.")
-                    else:
-                        x_data = temp_df['x'].tolist()
-                        y_data = temp_df['y'].tolist()
-                        
-                        # Gọi hàm vẽ
-                        fig_scatter = create_scatter_chart(x_data, y_data, x_col, y_col, pl_num)
-                        st.plotly_chart(fig_scatter, use_container_width=True, config={'displayModeBar': False})
-                        
-                        # Nút Tải ảnh (Giữ nguyên)
-                        st.write("")
-                        col_empty1, col_btn, col_empty2 = st.columns([1, 2, 1])
-                        with col_btn:
-                            img_bytes = fig_scatter.to_image(format="png", width=1100, height=600, scale=2)
-                            st.download_button("📥 TẢI BIỂU ĐỒ VỀ (PNG)", data=img_bytes, file_name=f"Scatter-{pl_num}.png", mime="image/png", use_container_width=True, type="primary")
-                except Exception as e:
-                    st.error(f"⚠️ Đã có lỗi xảy ra: {e}")
+                    st.write("")
+                    col_empty1, col_btn, col_empty2 = st.columns([1, 2, 1])
+                    with col_btn:
+                        img_bytes = fig_scatter.to_image(format="png", width=1100, height=600, scale=2)
+                        st.download_button("📥 TẢI BIỂU ĐỒ VỀ (PNG)", data=img_bytes, file_name=f"Scatter-{pl_num}.png", mime="image/png", use_container_width=True, type="primary")
+            except Exception as e:
+                st.error(f"⚠️ Đã có lỗi xảy ra: {e}")
