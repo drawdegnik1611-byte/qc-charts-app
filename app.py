@@ -171,20 +171,32 @@ elif tool_mode == "📈 Biểu đồ Phân tán (Scatter)":
                     st.warning(f"⚠️ Chú ý: Trục X có {len(x_parts)} số, Trục Y có {len(y_parts)} số. Hệ thống sẽ tự động ghép {min_len} cặp số đầu tiên để vẽ biểu đồ.")
 
     # --- PHẦN CHUNG: KIỂM TRA & VẼ BIỂU ĐỒ (Dùng chung cho cả 2 cách nhập) ---
-    if not df.empty:
+   if not df.empty:
         st.write("👀 **Kiểm tra & Chỉnh sửa Dữ liệu:**")
         st.caption("💡 Bạn có thể click đúp vào ô để sửa số, hoặc chọn các dòng thừa (chứa chữ/tiêu đề) và bấm phím Delete/Backspace để xóa.")
         
         edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True, height=250)
         
+        # BƯỚC 1: Chọn cột chứa dữ liệu tính toán
+        st.write("📍 **1. Chọn dữ liệu:**")
         col1, col2 = st.columns(2)
         with col1:
             x_col = st.selectbox("Chọn cột cho Trục X (Hoành):", edited_df.columns, index=0)
         with col2:
-            # Lọc danh sách Y để không trùng với X
             y_options = [c for c in edited_df.columns if c != x_col]
             y_col = st.selectbox("Chọn cột cho Trục Y (Tung):", y_options if y_options else edited_df.columns)
             
+        # BƯỚC 2: Nhập tên trục sẽ hiển thị trên ảnh biểu đồ
+        st.write("✏️ **2. Tùy chỉnh tên trục trên biểu đồ (Tùy chọn):**")
+        st.caption("Tên này sẽ được in trực tiếp lên ảnh PNG tải về. Bạn có thể xóa để sửa lại cho đẹp.")
+        col_name_x, col_name_y = st.columns(2)
+        with col_name_x:
+            x_display_name = st.text_input("Tên hiển thị Trục X:", value=x_col)
+        with col_name_y:
+            y_display_name = st.text_input("Tên hiển thị Trục Y:", value=y_col)
+            
+        # NÚT VẼ BIỂU ĐỒ
+        st.write("")
         if st.button("🚀 VẼ BIỂU ĐỒ PHÂN TÁN", type="primary"):
             try:
                 # Ép kiểu dữ liệu cực mạnh: thấy chữ là xóa
@@ -202,7 +214,8 @@ elif tool_mode == "📈 Biểu đồ Phân tán (Scatter)":
                     x_data = temp_df['x'].tolist()
                     y_data = temp_df['y'].tolist()
                     
-                    fig_scatter = create_scatter_chart(x_data, y_data, x_col, y_col, pl_num)
+                    # TRUYỀN TÊN HIỂN THỊ MỚI VÀO HÀM VẼ (Thay vì dùng tên cột gốc)
+                    fig_scatter = create_scatter_chart(x_data, y_data, x_display_name, y_display_name, pl_num)
                     st.plotly_chart(fig_scatter, use_container_width=True, config={'displayModeBar': False})
                     
                     st.write("")
